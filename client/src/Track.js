@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import Web3 from "web3";
-import SupplyChainABI from "./artifacts/SupplyChain.json"
+import React, { useState, useEffect } from 'react';
+import Web3 from 'web3';
+import SupplyChainABI from './artifacts/SupplyChain.json';
 import Table from 'react-bootstrap/Table';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import Button from 'react-bootstrap/Button';
@@ -10,7 +10,8 @@ function Track() {
     useEffect(() => {
         loadWeb3();
         loadBlockchaindata();
-    }, [])
+    }, []);
+
     const [showMain, setShowMain] = useState(true);
     const [selectedRed, setSelectedRec] = useState({});
     const [loader, setloader] = useState(true);
@@ -24,15 +25,12 @@ function Track() {
     const [RET, setRET] = useState();
 
     const loadWeb3 = async () => {
-        if (window.ethereum) {
-            window.web3 = new Web3(window.ethereum);
-            await window.ethereum.enable();
-        } else if (window.web3) {
-            window.web3 = new Web3(window.web3.currentProvider);
-        } else {
-            window.alert(
-                "Non-Ethereum browser detected. You should consider trying MetaMask!"
-            );
+        try {
+            const ganacheProvider = new Web3.providers.HttpProvider('http://127.0.0.1:7545'); // Local Ganache server
+            window.web3 = new Web3(ganacheProvider);
+        } catch (error) {
+            console.error('Error connecting to Ganache:', error);
+            window.alert('Error connecting to the local Ganache server. Please ensure it is running.');
         }
     };
 
@@ -166,7 +164,6 @@ function Track() {
                             <li className={selectedRed?.stage >= "2" ? "active" : ""}>Manufacturer</li>
                             <li className={selectedRed?.stage >= "3" ? "active" : ""}>Distributor</li>
                             <li className={selectedRed?.stage >= "4" ? "active" : ""}>Retailer</li>
-                            <li className={selectedRed?.stage >= "5" ? "active" : ""}>Consumer</li>
                         </ul>
                     </div>
                     <div className="page-content page-container" id="page-content">
@@ -224,4 +221,4 @@ function Track() {
     )
 }
 
-export default Track
+export default Track;

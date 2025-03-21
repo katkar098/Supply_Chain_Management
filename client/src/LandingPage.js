@@ -9,17 +9,14 @@ function LandingPage() {
     loadBlockchaindata();
   }, []);
   const loadWeb3 = async () => {
-    if (window.ethereum) {
-      window.web3 = new Web3(window.ethereum);
-      await window.ethereum.enable();
-    } else if (window.web3) {
-      window.web3 = new Web3(window.web3.currentProvider);
-    } else {
-      window.alert(
-        "Non-Ethereum browser detected. You should consider trying MetaMask!"
-      );
-    }
-  };
+                try {
+                    const ganacheProvider = new Web3.providers.HttpProvider('http://127.0.0.1:7545'); // Local Ganache server
+                    window.web3 = new Web3(ganacheProvider);
+                } catch (error) {
+                    console.error('Error connecting to Ganache:', error);
+                    window.alert('Error connecting to the local Ganache server. Please ensure it is running.');
+                }
+            };
   const loadBlockchaindata = async () => {
     const web3 = window.web3;
     const accounts = await web3.eth.getAccounts();

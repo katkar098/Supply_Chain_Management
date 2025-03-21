@@ -2,274 +2,139 @@
 pragma solidity >=0.4.22 <0.9.0;
 
 contract SupplyChain {
-    //Smart Contract owner will be the person who deploys the contract only he can authorize various roles like retailer, Manufacturer,etc
     address public Owner;
 
-    //note this constructor will be called when smart contract will be deployed on blockchain
     constructor() public {
         Owner = msg.sender;
     }
 
-    //Roles (flow of pharma supply chain)
-    // RawMaterialSupplier; //This is where Manufacturer will get raw materials to make medicines
-    // Manufacturer;  //Various WHO guidelines should be followed by this person
-    // Distributor; //This guy distributes the medicines to retailers
-    // Retailer; //Normal customer buys from the retailer
-
-    //modifier to make sure only the owner is using the function
     modifier onlyByOwner() {
-        require(msg.sender == Owner);
+        require(msg.sender == Owner, "Only contract owner can perform this action");
         _;
     }
 
-    //stages of a medicine in pharma supply chain
-    enum STAGE {
-        Init,
-        RawMaterialSupply,
-        Manufacture,
-        Distribution,
-        Retail,
-        sold
-    }
-    //using this we are going to track every single medicine the owner orders
+    enum STAGE { Init, RawMaterialSupply, Manufacture, Distribution, Retail, Sold }
 
-    //Medicine count
-    uint256 public medicineCtr = 0;
-    //Raw material supplier count
-    uint256 public rmsCtr = 0;
-    //Manufacturer count
-    uint256 public manCtr = 0;
-    //distributor count
-    uint256 public disCtr = 0;
-    //retailer count
-    uint256 public retCtr = 0;
+    uint256 public medicineCtr;
+    uint256 public rmsCtr;
+    uint256 public manCtr;
+    uint256 public disCtr;
+    uint256 public retCtr;
 
-    //To store information about the medicine
-    struct medicine {
-        uint256 id; //unique medicine id
-        string name; //name of the medicine
-        string description; //about medicine
-        string compositions; //about compostion
-        uint256 quantity; //medicine quantity
-        uint256 RMSid; //id of the Raw Material supplier for this particular medicine
-        uint256 MANid; //id of the Manufacturer for this particular medicine
-        uint256 DISid; //id of the distributor for this particular medicine
-        uint256 RETid; //id of the retailer for this particular medicine
-        STAGE stage; //current medicine stage
+    struct Medicine {
+        uint256 id;
+        string name;
+        string description;
+        string compositions;
+        uint256 quantity;
+        uint256 RMSid;
+        uint256 MANid;
+        uint256 DISid;
+        uint256 RETid;
+        STAGE stage;
     }
 
-    //To store all the medicines on the blockchain
-    mapping(uint256 => medicine) public MedicineStock;
+    mapping(uint256 => Medicine) public MedicineStock;
 
-    //To show status to client applications
-    function showStage(
-        uint256 _medicineID
-    ) public view returns (string memory) {
-        require(medicineCtr > 0);
-        if (MedicineStock[_medicineID].stage == STAGE.Init)
-            return "Medicine Ordered";
-        else if (MedicineStock[_medicineID].stage == STAGE.RawMaterialSupply)
-            return "Raw Material Supply Stage";
-        else if (MedicineStock[_medicineID].stage == STAGE.Manufacture)
-            return "Manufacturing Stage";
-        else if (MedicineStock[_medicineID].stage == STAGE.Distribution)
-            return "Distribution Stage";
-        else if (MedicineStock[_medicineID].stage == STAGE.Retail)
-            return "Retail Stage";
-        else if (MedicineStock[_medicineID].stage == STAGE.sold)
-            return "Medicine Sold";
-    }
-
-    //To store information about raw material supplier
-    struct rawMaterialSupplier {
+    struct Supplier {
         address addr;
         uint256 id;
         string name;
         string place;
     }
 
-    //To store all the raw material suppliers on the blockchain
-    mapping(uint256 => rawMaterialSupplier) public RMS;
+    mapping(uint256 => Supplier) public RMS;
+    mapping(uint256 => Supplier) public MAN;
+    mapping(uint256 => Supplier) public DIS;
+    mapping(uint256 => Supplier) public RET;
 
-    //To store information about manufacturer
-    struct manufacturer {
-        address addr;
-        uint256 id;
-        string name;
-        string place;
+    mapping(address => uint256) public RMSMap;
+    mapping(address => uint256) public MANMap;
+    mapping(address => uint256) public DISMap;
+    mapping(address => uint256) public RETMap;
+
+    event MedicineAdded(uint256 indexed id, string name, uint256 quantity);
+    event StageChanged(uint256 indexed medicineID, STAGE stage);
+    event SupplierAdded(string role, uint256 indexed id, address addr, string name);
+
+    function showStage(uint256 _medicineID) public view returns (string memory) {
+        require(_medicineID > 0 && _medicineID <= medicineCtr, "Invalid medicine ID");
+        STAGE stage = MedicineStock[_medicineID].stage;
+        if (stage == STAGE.Init) return "Medicine Ordered";
+        if (stage == STAGE.RawMaterialSupply) return "Raw Material Supplied";
+        if (stage == STAGE.Manufacture) return "Manufacturing";
+        if (stage == STAGE.Distribution) return "Distribution";
+        if (stage == STAGE.Retail) return "Retail";
+        if (stage == STAGE.Sold) return "Medicine Sold";
+        return "Unknown Stage";
     }
 
-    //To store all the manufacturers on the blockchain
-    mapping(uint256 => manufacturer) public MAN;
-
-    //To store information about distributor
-    struct distributor {
-        address addr;
-        uint256 id;
-        string name;
-        string place;
+    function addSupplier(string memory role, mapping(uint256 => Supplier) storage supplierMap, mapping(address => uint256) storage supplierAddressMap, uint256 counter, address _address, string memory _name, string memory _place) private {
+        counter++;
+        supplierMap[counter] = Supplier(_address, counter, _name, _place);
+        supplierAddressMap[_address] = counter;
+        emit SupplierAdded(role, counter, _address, _name);
     }
 
-    //To store all the distributors on the blockchain
-    mapping(uint256 => distributor) public DIS;
-
-    //To store information about retailer
-    struct retailer {
-        address addr;
-        uint256 id;
-        string name;
-        string place;
-    }
-
-    //To store all the retailers on the blockchain
-    mapping(uint256 => retailer) public RET;
-
-    //To add raw material suppliers. Only contract owner can add a new raw material supplier
-    function addRMS(
-        address _address,
-        string memory _name,
-        string memory _place
-    ) public onlyByOwner {
+    function addRMS(address _address, string memory _name, string memory _place) public onlyByOwner {
+        addSupplier("RMS", RMS, RMSMap, rmsCtr, _address, _name, _place);
         rmsCtr++;
-        RMS[rmsCtr] = rawMaterialSupplier(_address, rmsCtr, _name, _place);
     }
 
-    //To add manufacturer. Only contract owner can add a new manufacturer
-    function addManufacturer(
-        address _address,
-        string memory _name,
-        string memory _place
-    ) public onlyByOwner {
+    function addManufacturer(address _address, string memory _name, string memory _place) public onlyByOwner {
+        addSupplier("Manufacturer", MAN, MANMap, manCtr, _address, _name, _place);
         manCtr++;
-        MAN[manCtr] = manufacturer(_address, manCtr, _name, _place);
     }
 
-    //To add distributor. Only contract owner can add a new distributor
-    function addDistributor(
-        address _address,
-        string memory _name,
-        string memory _place
-    ) public onlyByOwner {
+    function addDistributor(address _address, string memory _name, string memory _place) public onlyByOwner {
+        addSupplier("Distributor", DIS, DISMap, disCtr, _address, _name, _place);
         disCtr++;
-        DIS[disCtr] = distributor(_address, disCtr, _name, _place);
     }
 
-    //To add retailer. Only contract owner can add a new retailer
-    function addRetailer(
-        address _address,
-        string memory _name,
-        string memory _place
-    ) public onlyByOwner {
+    function addRetailer(address _address, string memory _name, string memory _place) public onlyByOwner {
+        addSupplier("Retailer", RET, RETMap, retCtr, _address, _name, _place);
         retCtr++;
-        RET[retCtr] = retailer(_address, retCtr, _name, _place);
     }
 
-    //To supply raw materials from RMS supplier to the manufacturer
+    function updateStage(uint256 _medicineID, mapping(address => uint256) storage supplierMap, STAGE currentStage, STAGE nextStage) private {
+        require(_medicineID > 0 && _medicineID <= medicineCtr, "Invalid medicine ID");
+        require(supplierMap[msg.sender] > 0, "Unauthorized action");
+        require(MedicineStock[_medicineID].stage == currentStage, "Invalid Stage");
+        MedicineStock[_medicineID].stage = nextStage;
+        emit StageChanged(_medicineID, nextStage);
+    }
+
     function RMSsupply(uint256 _medicineID) public {
-        require(_medicineID > 0 && _medicineID <= medicineCtr);
-        uint256 _id = findRMS(msg.sender);
-        require(_id > 0);
-        require(MedicineStock[_medicineID].stage == STAGE.Init);
-        MedicineStock[_medicineID].RMSid = _id;
-        MedicineStock[_medicineID].stage = STAGE.RawMaterialSupply;
+        updateStage(_medicineID, RMSMap, STAGE.Init, STAGE.RawMaterialSupply);
+        MedicineStock[_medicineID].RMSid = RMSMap[msg.sender];
     }
 
-    //To check if RMS is available in the blockchain
-    function findRMS(address _address) private view returns (uint256) {
-        require(rmsCtr > 0);
-        for (uint256 i = 1; i <= rmsCtr; i++) {
-            if (RMS[i].addr == _address) return RMS[i].id;
-        }
-        return 0;
-    }
-
-    //To manufacture medicine
     function Manufacturing(uint256 _medicineID) public {
-        require(_medicineID > 0 && _medicineID <= medicineCtr);
-        uint256 _id = findMAN(msg.sender);
-        require(_id > 0);
-        require(MedicineStock[_medicineID].stage == STAGE.RawMaterialSupply);
-        MedicineStock[_medicineID].MANid = _id;
-        MedicineStock[_medicineID].stage = STAGE.Manufacture;
+        updateStage(_medicineID, MANMap, STAGE.RawMaterialSupply, STAGE.Manufacture);
+        MedicineStock[_medicineID].MANid = MANMap[msg.sender];
     }
 
-    //To check if Manufacturer is available in the blockchain
-    function findMAN(address _address) private view returns (uint256) {
-        require(manCtr > 0);
-        for (uint256 i = 1; i <= manCtr; i++) {
-            if (MAN[i].addr == _address) return MAN[i].id;
-        }
-        return 0;
-    }
-
-    //To supply medicines from Manufacturer to distributor
     function Distribute(uint256 _medicineID) public {
-        require(_medicineID > 0 && _medicineID <= medicineCtr);
-        uint256 _id = findDIS(msg.sender);
-        require(_id > 0);
-        require(MedicineStock[_medicineID].stage == STAGE.Manufacture);
-        MedicineStock[_medicineID].DISid = _id;
-        MedicineStock[_medicineID].stage = STAGE.Distribution;
+        updateStage(_medicineID, DISMap, STAGE.Manufacture, STAGE.Distribution);
+        MedicineStock[_medicineID].DISid = DISMap[msg.sender];
     }
 
-    //To check if distributor is available in the blockchain
-    function findDIS(address _address) private view returns (uint256) {
-        require(disCtr > 0);
-        for (uint256 i = 1; i <= disCtr; i++) {
-            if (DIS[i].addr == _address) return DIS[i].id;
-        }
-        return 0;
-    }
-
-    //To supply medicines from distributor to retailer
     function Retail(uint256 _medicineID) public {
-        require(_medicineID > 0 && _medicineID <= medicineCtr);
-        uint256 _id = findRET(msg.sender);
-        require(_id > 0);
-        require(MedicineStock[_medicineID].stage == STAGE.Distribution);
-        MedicineStock[_medicineID].RETid = _id;
-        MedicineStock[_medicineID].stage = STAGE.Retail;
+        updateStage(_medicineID, RETMap, STAGE.Distribution, STAGE.Retail);
+        MedicineStock[_medicineID].RETid = RETMap[msg.sender];
     }
 
-    //To check if retailer is available in the blockchain
-    function findRET(address _address) private view returns (uint256) {
-        require(retCtr > 0);
-        for (uint256 i = 1; i <= retCtr; i++) {
-            if (RET[i].addr == _address) return RET[i].id;
-        }
-        return 0;
+    function sold(uint256 _medicineID) public onlyByOwner {
+        require(_medicineID > 0 && _medicineID <= medicineCtr, "Invalid medicine ID");
+        require(MedicineStock[_medicineID].stage == STAGE.Retail, "Invalid Stage");
+        MedicineStock[_medicineID].stage = STAGE.Sold;
+        emit StageChanged(_medicineID, STAGE.Sold);
     }
 
-    //To sell medicines from retailer to consumer
-    function sold(uint256 _medicineID) public {
-        require(_medicineID > 0 && _medicineID <= medicineCtr);
-        uint256 _id = findRET(msg.sender);
-        require(_id > 0);
-        require(_id == MedicineStock[_medicineID].RETid); //Only correct retailer can mark medicine as sold
-        require(MedicineStock[_medicineID].stage == STAGE.Retail);
-        MedicineStock[_medicineID].stage = STAGE.sold;
-    }
-
-    // To add new medicines to the stock
-    function addMedicine(
-        string memory _name,
-        string memory _description,
-        string memory _composition,
-        uint256 _quantity
-    ) public onlyByOwner {
-        require((rmsCtr > 0) && (manCtr > 0) && (disCtr > 0) && (retCtr > 0));
+    function addMedicine(string memory _name, string memory _description, string memory _composition, uint256 _quantity) public onlyByOwner {
+        require(rmsCtr > 0 && manCtr > 0 && disCtr > 0 && retCtr > 0, "All supply chain roles must be registered");
         medicineCtr++;
-        MedicineStock[medicineCtr] = medicine(
-            medicineCtr,
-            _name, // set the name of medicine
-            _description, // set the description of the medicine
-            _composition, // set the composition of the medicine
-            _quantity, // Set the number of quantities
-            0,
-            0,
-            0,
-            0,
-            STAGE.Init
-        );
+        MedicineStock[medicineCtr] = Medicine(medicineCtr, _name, _description, _composition, _quantity, 0, 0, 0, 0, STAGE.Init);
+        emit MedicineAdded(medicineCtr, _name, _quantity);
     }
 }

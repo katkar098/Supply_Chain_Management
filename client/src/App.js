@@ -13,14 +13,22 @@ function App() {
     <div className="App">
       <Navbar className='nav-content' bg={window?.location?.pathname === "/" ? "primary" : "primary"} variant="dark">
         <Container>
-          <Navbar.Brand href="/">
-            <img
-              alt=""
-              src="https://lever-client-logos.s3.us-west-2.amazonaws.com/d4ee0bc6-7ccb-4762-86e1-07d7a007314b-1645085353318.png"
-              height="36"
-              className="d-inline-block align-top"
-            /> WEB3.0
-          </Navbar.Brand>
+        <Navbar.Brand 
+  href="/" 
+  style={{ 
+    fontFamily: "'Poppins', sans-serif", 
+    fontSize: "28px", 
+    fontWeight: "900", 
+    letterSpacing: "1px", 
+    color: "#ff5733",
+    textTransform: "uppercase"
+  }}
+>
+    Medi <span style={{ color: "white", textShadow: "2px 2px 4px rgba(255, 255, 255, 0.6)" }}>Track</span>
+</Navbar.Brand>
+
+
+
           <Nav className="me-auto nav-links">
             <Nav.Link href="/register" className={window?.location?.pathname === "/register" ? "active-link" : ""}>Register</Nav.Link>
             <Nav.Link href="/order-medicine" className={window?.location?.pathname === "/order-medicine" ? "active-link" : ""}>Order Medicines</Nav.Link>
